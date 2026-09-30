@@ -1,8 +1,10 @@
 import time
+import threading
 from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from apscheduler.schedulers.background import BackgroundScheduler
+import uvicorn
 
 from config import CLIENTS_DIR, SCHEDULER_INTERVAL, PLATFORMS
 from db import init_db, get_or_create_client, add_to_queue, get_due_posts, update_queue_status, get_account
@@ -10,6 +12,10 @@ from utils import logger, load_captions, get_schedule, move_video
 from posters.youtube import post_to_youtube
 from posters.meta import post_to_facebook, post_to_instagram
 from posters.tiktok import post_to_tiktok
+
+DASHBOARD_HOST = "127.0.0.1"
+DASHBOARD_PORT = 8787
+
 
 class VideoHandler(FileSystemEventHandler):
     def on_created(self, event):
@@ -19,7 +25,6 @@ class VideoHandler(FileSystemEventHandler):
         if path.suffix.lower() not in {".mp4", ".mov", ".mkv"}:
             return
 
-        # Ignore temporary files
         if path.name.startswith(".") or path.name.endswith(".tmp"):
             return
 
@@ -28,7 +33,6 @@ class VideoHandler(FileSystemEventHandler):
 
     def process_video(self, video_path: Path):
         try:
-            # clients/dr_smith/ready/video.mp4 → slug = dr_smith
             client_folder = video_path.parent.parent
             slug = client_folder.name
             client_id = get_or_create_client(slug)
@@ -58,6 +62,7 @@ class VideoHandler(FileSystemEventHandler):
 
         except Exception as e:
             logger.exception(f"Error processing {video_path}: {e}")
+
 
 def process_due_posts():
     due = get_due_posts()
@@ -105,9 +110,29 @@ def process_due_posts():
             update_queue_status(post["id"], "failed", error=str(e))
             logger.exception(f"Exception posting to {platform}: {e}")
 
+
+def start_dashboard():
+    """Run the FastAPI dashboard in a background thread."""
+    from dashboard import app
+    config = uvicorn.Config(
+        app,
+        host=DASHBOARD_HOST,
+        port=DASHBOARD_PORT,
+        log_level="warning",
+        access_log=False,
+    )
+    server = uvicorn.Server(config)
+    server.run()
+
+
 def main():
     init_db()
     logger.info("AgencyPost service starting...")
+
+    # Start web dashboard
+    dash_thread = threading.Thread(target=start_dashboard, daemon=True)
+    dash_thread.start()
+    logger.info(f"Dashboard available at http://{DASHBOARD_HOST}:{DASHBOARD_PORT}")
 
     # Start folder watcher
     event_handler = VideoHandler()
@@ -130,6 +155,7 @@ def main():
         observer.stop()
         scheduler.shutdown()
     observer.join()
+
 
 if __name__ == "__main__":
     main()
