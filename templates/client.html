@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ client.slug }} · AgencyPost</title>
+  <style>
+    :root { --bg:#0f1419; --card:#1a2332; --border:#2d3a4d; --text:#e7ecf3; --muted:#8b9bb4; --accent:#3b82f6; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; min-height: 100vh; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+    header { margin-bottom: 24px; }
+    a.back { color: var(--muted); text-decoration: none; font-size: 0.875rem; }
+    a.back:hover { color: var(--accent); }
+    h1 { font-size: 1.5rem; margin: 8px 0 4px; }
+    .muted { color: var(--muted); font-size: 0.875rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .card h2 { font-size: 1rem; margin-bottom: 14px; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .badge.ok { background: rgba(34,197,94,.15); color: var(--ok); }
+    .badge.off { background: rgba(139,155,180,.12); color: var(--muted); }
+    form .row { margin-bottom: 12px; }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+    input, select, textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 0.875rem; }
+    input:focus, select:focus { outline: 2px solid var(--accent); }
+    button.btn { background: var(--accent); color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.875rem; margin-top: 8px; }
+    button.btn:hover { filter: brightness(1.1); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; }
+    .status-pending, .status-uploading { color: var(--warn); }
+    .status-posted { color: var(--ok); }
+    .status-failed { color: var(--err); }
+    .hint { font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
+    details { margin-top: 12px; }
+    summary { cursor: pointer; color: var(--accent); font-size: 0.875rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="back" href="/">← All clients</a>
+      <h1>{{ client.slug }}</h1>
+      <p class="muted">{{ now }}</p>
+    </header>
+
+    <div class="card">
+      <h2>Connected platforms</h2>
+      {% for p, a in client.accounts.items() %}
+        <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px">
+          {% if a.connected %}
+            <span class="badge ok">● {{ p }}</span>
+            <span class="muted">{% if a.account_name %}{{ a.account_name }} · {% endif %}{{ a.account_id or "" }}</span>
+          {% else %}
+            <span class="badge off">○ {{ p }} not connected</span>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="card">
+      <h2>Connect / update account</h2>
+      <p class="hint" style="margin-bottom:14px">
+        Paste tokens from your developer apps. For YouTube you need client_id, client_secret and refresh_token.
+        For Meta/TikTok usually a long-lived access_token is enough.
+      </p>
+      <form method="post" action="/client/{{ client.slug }}/connect">
+        <div class="row">
+          <label>Platform</label>
+          <select name="platform" required>
+            <option value="youtube">YouTube</option>
+            <option value="facebook">Facebook</option>
+            <option value="instagram">Instagram</option>
+            <option value="tiktok">TikTok</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Access token</label>
+          <input name="access_token" required placeholder="ya29... or EAAG... or act.">
+        </div>
+        <div class="row">
+          <label>Refresh token (YouTube especially)</label>
+          <input name="refresh_token" placeholder="1//...">
+        </div>
+        <div class="row">
+          <label>Account / Channel / Page ID</label>
+          <input name="account_id" placeholder="UCxxxx or Page ID or IG user id">
+        </div>
+        <div class="row">
+          <label>Account display name</label>
+          <input name="account_name" placeholder="Dr Smith Official">
+        </div>
+        <details>
+          <summary>OAuth client credentials (YouTube)</summary>
+          <div class="row" style="margin-top:10px">
+            <label>Client ID</label>
+            <input name="client_id_oauth" placeholder="xxxx.apps.googleusercontent.com">
+          </div>
+          <div class="row">
+            <label>Client Secret</label>
+            <input name="client_secret" placeholder="GOCSPX-...">
+          </div>
+        </details>
+        <button class="btn" type="submit">Save connection</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Recent posts / queue</h2>
+      {% if client.queue %}
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Platform</th>
+            <th>Status</th>
+            <th>Title</th>
+            <th>Scheduled</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for q in client.queue %}
+          <tr>
+            <td>{{ q.id }}</td>
+            <td>{{ q.platform }}</td>
+            <td class="status-{{ q.status }}">{{ q.status }}</td>
+            <td>{{ q.title or "—" }}</td>
+            <td class="muted">{{ q.scheduled_at or "immediate" }}</td>
+            <td class="muted" style="max-width:200px;overflow:hidden;text-overflow:ellipsis">{{ q.error_message or "" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <p class="muted">No items in queue yet. Drop a video into <code>clients/{{ client.slug }}/ready/</code></p>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

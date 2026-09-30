@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgencyPost Dashboard</title>
+  <style>
+    :root { --bg:#0f1419; --card:#1a2332; --border:#2d3a4d; --text:#e7ecf3; --muted:#8b9bb4; --accent:#3b82f6; --ok:#22c55e; --warn:#f59e0b; --err:#ef4444; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; min-height: 100vh; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
+    h1 { font-size: 1.5rem; font-weight: 700; }
+    .muted { color: var(--muted); font-size: 0.875rem; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .card h2 { font-size: 1.1rem; margin-bottom: 12px; }
+    .platforms { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .badge.ok { background: rgba(34,197,94,.15); color: var(--ok); }
+    .badge.off { background: rgba(139,155,180,.12); color: var(--muted); }
+    a.btn, button.btn { display: inline-block; background: var(--accent); color: #fff; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; text-decoration: none; cursor: pointer; font-size: 0.875rem; }
+    a.btn:hover, button.btn:hover { filter: brightness(1.1); }
+    .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    form.inline { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; margin-top: 16px; }
+    input, select { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 0.875rem; }
+    input:focus { outline: 2px solid var(--accent); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; }
+    .status-pending { color: var(--warn); }
+    .status-posted { color: var(--ok); }
+    .status-failed { color: var(--err); }
+    .empty { color: var(--muted); padding: 24px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>AgencyPost</h1>
+        <p class="muted">Local dashboard · {{ now }}</p>
+      </div>
+      <a class="btn btn-secondary" href="/api/status" target="_blank">JSON API</a>
+    </header>
+
+    <div class="card">
+      <h2>Add client</h2>
+      <form class="inline" method="post" action="/client/create">
+        <div>
+          <label class="muted" style="display:block;margin-bottom:4px">Slug (folder name)</label>
+          <input name="slug" placeholder="dr_smith" required pattern="[a-z0-9_]+" title="lowercase letters, numbers, underscore">
+        </div>
+        <div>
+          <label class="muted" style="display:block;margin-bottom:4px">Display name</label>
+          <input name="name" placeholder="Dr. Smith">
+        </div>
+        <button class="btn" type="submit">Create</button>
+      </form>
+    </div>
+
+    {% if not clients %}
+      <div class="card empty">No clients yet. Create one above, or drop a video into <code>clients/&lt;name&gt;/ready/</code>.</div>
+    {% endif %}
+
+    {% for c in clients %}
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <h2 style="margin:0">{{ c.slug }}</h2>
+        <a class="btn" href="/client/{{ c.slug }}">Manage & Connect →</a>
+      </div>
+      <div class="platforms">
+        {% for p, a in c.accounts.items() %}
+          {% if a.connected %}
+            <span class="badge ok">● {{ p }} {% if a.account_name %}· {{ a.account_name }}{% endif %}</span>
+          {% else %}
+            <span class="badge off">○ {{ p }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% if c.queue %}
+        <p class="muted" style="margin-top:8px">Recent: {{ c.queue|length }} queue items</p>
+      {% else %}
+        <p class="muted" style="margin-top:8px">No posts in queue yet</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</body>
+</html>
