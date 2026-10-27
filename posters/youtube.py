@@ -34,18 +34,18 @@ def post_to_youtube(account: dict, video_path: Path, title: str, description: st
 
     try:
         refresh_token = account.get("refresh_token")
-        client_id = account.get("client_id")
-        client_secret = account.get("client_secret")
 
-        # Fallback: try to parse extra_data if it is a JSON string
-        if (not client_id or not client_secret) and account.get("extra_data"):
-            import json
+        # NOTE: account["client_id"] is the internal AgencyPost client row id, NOT the
+        # Google OAuth client id. OAuth credentials live in extra_data only.
+        import json
+        extra = account.get("extra_data") or {}
+        if isinstance(extra, str):
             try:
-                extra = json.loads(account["extra_data"]) if isinstance(account["extra_data"], str) else account["extra_data"]
-                client_id = client_id or extra.get("client_id")
-                client_secret = client_secret or extra.get("client_secret")
+                extra = json.loads(extra)
             except Exception:
-                pass
+                extra = {}
+        client_id = extra.get("client_id")
+        client_secret = extra.get("client_secret")
 
         if not refresh_token:
             return {"success": False, "error": "Missing refresh_token in account"}
@@ -53,23 +53,20 @@ def post_to_youtube(account: dict, video_path: Path, title: str, description: st
         if not client_id or not client_secret:
             return {
                 "success": False,
-                "error": "Missing client_id / client_secret. Store them in the account record (or in extra_data JSON)."
+                "error": "Missing client_id / client_secret. Store them in the account's extra_data "
+                         "(dashboard: 'OAuth client credentials')."
             }
 
         creds = Credentials(
-            token=account.get("access_token"),
+            token=None,
             refresh_token=refresh_token,
             token_uri=account.get("token_uri") or "https://oauth2.googleapis.com/token",
             client_id=client_id,
             client_secret=client_secret,
             scopes=["https://www.googleapis.com/auth/youtube.upload"],
         )
-
-        if not creds.valid:
-            if creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                return {"success": False, "error": "Credentials are invalid and cannot be refreshed"}
+        # Always fetch a fresh access token (pasted ones expire after ~1 hour)
+        creds.refresh(Request())
 
         youtube = build("youtube", "v3", credentials=creds)
 

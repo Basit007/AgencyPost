@@ -149,3 +149,19 @@ def update_queue_status(queue_id: int, status: str, platform_post_id: str = None
     """, (status, platform_post_id, error, posted_at, queue_id))
     conn.commit()
     conn.close()
+
+
+def update_account_tokens(client_id: int, platform: str, access_token: str,
+                          refresh_token: str = None, token_expires_at: str = None):
+    """Persist refreshed OAuth tokens without touching the rest of the account row."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE accounts
+        SET access_token = ?,
+            refresh_token = COALESCE(?, refresh_token),
+            token_expires_at = ?
+        WHERE client_id = ? AND platform = ?
+    """, (access_token, refresh_token, token_expires_at, client_id, platform))
+    conn.commit()
+    conn.close()
